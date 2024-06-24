@@ -1,23 +1,25 @@
-import { IconSearch } from '@/components/Icons'
-import BlurBackground from '../BlurBackground/BlurBackground'
-import { IProductResult } from '@/type'
-import SearchItem from './SearchItem'
-import EmptyState from './EmptyState'
-import { useEffect } from 'react'
+import { IconSearch } from '@/components/Icons';
+import BlurBackground from '../BlurBackground/BlurBackground';
+import SearchItem from './SearchItem';
+import EmptyState from './EmptyState';
+import { useEffect, useState } from 'react';
+import { Product } from '@/utils/supabase/types';
+import { createBrowserClient } from '@/utils/supabase/browser';
+import ProductsService from '@/utils/supabase/services/products';
 
 type ITrend = {
-  name: string
-  href: string
-}
+  name: string;
+  href: string;
+};
 
 type Props = {
-  isCommandActive: boolean
-  searchResult?: IProductResult[]
-  trend?: ITrend[]
-  searchValue?: string
-  setCommandActive?: (val: boolean) => void
-  setSearch?: (val: string) => void
-}
+  isCommandActive: boolean;
+  searchResult?: Product[];
+  trend?: ITrend[];
+  searchValue?: string;
+  setCommandActive?: (val: boolean) => void;
+  setSearch?: (val: string) => void;
+};
 
 export default ({
   isCommandActive,
@@ -27,9 +29,30 @@ export default ({
   setSearch = () => '',
   trend = [],
 }: Props) => {
+  const getTrendingTools = async () => {
+    const today = new Date();
+    const productService = new ProductsService(createBrowserClient());
+    const week = await productService.getWeekNumber(today, 2);
+    return await productService.getPrevLaunchWeeks(today.getFullYear(), 2, week, 1);
+  };
+
+  const [trendingTools, setTrendingTools] = useState<[]>([]);
+
   useEffect(() => {
-    isCommandActive ? document.body.classList.add('overflow-hidden') : document.body.classList.remove('overflow-hidden')
-  }, [isCommandActive])
+    getTrendingTools().then(tools => {
+      const allTools = tools?.map(tool => tool);
+      setTrendingTools(allTools as any);
+    });
+  }, []);
+
+  useEffect(() => {
+    isCommandActive ? document.body.classList.add('overflow-hidden') : document.body.classList.remove('overflow-hidden');
+  }, [isCommandActive]);
+
+  const handleClick = () => {
+    setCommandActive(false);
+  };
+
   return isCommandActive ? (
     <div className="fixed z-30 w-full h-full inset-0 rounded-xl flex items-center justify-center px-4">
       <BlurBackground isActive={true} setActive={setCommandActive} />
@@ -38,6 +61,7 @@ export default ({
           <IconSearch className="flex-none text-slate-400" />
           <input
             type="text"
+            autoFocus
             onChange={e => setSearch(e.target.value)}
             value={searchValue}
             placeholder="Search for tools"
@@ -49,7 +73,7 @@ export default ({
             searchResult.length > 0 ? (
               searchResult.map((item, idx) => (
                 <li key={idx}>
-                  <SearchItem item={item} />
+                  <SearchItem onClick={handleClick} item={item} />
                 </li>
               ))
             ) : (
@@ -57,18 +81,15 @@ export default ({
             )
           ) : (
             <div>
-              <h3 className="text-sm font-medium text-slate-500 p-3">What most people search for</h3>
+              <h3 className="text-sm font-medium text-slate-500 p-3">Current week tools</h3>
               <ul className="text-sm">
-                {trend.map((item, idx) => (
-                  <li key={idx}>
-                    <button
-                      onClick={() => setSearch(item.name)}
-                      className="block w-full px-3 py-2 rounded-lg text-left text-slate-400 from-indigo-900/20 to-indigo-800/10 hover:bg-gradient-to-l duration-150"
-                    >
-                      {item.name}
-                    </button>
-                  </li>
-                ))}
+                {trendingTools.map((group, idx) =>
+                  (group as { products: [] }).products.map((item, idx) => (
+                    <li key={idx}>
+                      <SearchItem onClick={handleClick} item={item} />
+                    </li>
+                  )),
+                )}
               </ul>
             </div>
           )}
@@ -77,5 +98,5 @@ export default ({
     </div>
   ) : (
     <></>
-  )
-}
+  );
+};
